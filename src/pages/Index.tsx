@@ -3,6 +3,10 @@ import { FileDropZone } from '@/components/FileDropZone';
 import { ProcessingStatus, ProcessingState } from '@/components/ProcessingStatus';
 import { LogViewer, LogEntry } from '@/components/LogViewer';
 import { ResultsPanel, ProcessingResult } from '@/components/ResultsPanel';
+import { LogDetailModal } from '@/components/LogDetailModal';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
@@ -11,6 +15,9 @@ const Index = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [currentFile, setCurrentFile] = useState<File | null>(null);
   const [result, setResult] = useState<ProcessingResult | null>(null);
+  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isDropModalOpen, setIsDropModalOpen] = useState(false);
   const { toast } = useToast();
 
   const addLog = useCallback((level: LogEntry['level'], message: string) => {
@@ -110,8 +117,14 @@ const Index = () => {
   const handleFileSelect = useCallback((file: File) => {
     setCurrentFile(file);
     setLogs([]);
+    setIsDropModalOpen(false);
     simulateProcessing(file);
   }, [simulateProcessing]);
+
+  const handleLogClick = useCallback((log: LogEntry) => {
+    setSelectedLog(log);
+    setIsDetailModalOpen(true);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -126,33 +139,55 @@ const Index = () => {
           </p>
         </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column */}
-          <div className="space-y-6">
-            <FileDropZone 
-              onFileSelect={handleFileSelect}
-              isProcessing={processingState === 'processing'}
-            />
-            
-            <ProcessingStatus
-              state={processingState}
-              progress={progress}
-              fileName={currentFile?.name}
-            />
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-6">
-            <LogViewer 
-              logs={logs}
-              isActive={processingState === 'processing'}
-            />
-          </div>
+        {/* Upload Button */}
+        <div className="text-center">
+          <Dialog open={isDropModalOpen} onOpenChange={setIsDropModalOpen}>
+            <DialogTrigger asChild>
+              <Button size="lg" className="h-14 px-8">
+                <Upload className="mr-2 h-5 w-5" />
+                Upload File to Process
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Upload File for Processing</DialogTitle>
+              </DialogHeader>
+              <FileDropZone 
+                onFileSelect={handleFileSelect}
+                isProcessing={processingState === 'processing'}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
+
+        {/* Processing Status */}
+        {processingState !== 'idle' && (
+          <ProcessingStatus
+            state={processingState}
+            progress={progress}
+            fileName={currentFile?.name}
+          />
+        )}
+
+        {/* Logs Table */}
+        {logs.length > 0 && (
+          <LogViewer 
+            logs={logs}
+            isActive={processingState === 'processing'}
+            onLogClick={handleLogClick}
+          />
+        )}
 
         {/* Results Section */}
         <ResultsPanel result={result} />
+
+        {/* Log Detail Modal */}
+        <LogDetailModal
+          open={isDetailModalOpen}
+          onOpenChange={setIsDetailModalOpen}
+          log={selectedLog}
+          result={result}
+        />
       </div>
     </div>
   );

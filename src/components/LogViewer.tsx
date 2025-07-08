@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
 export interface LogEntry {
@@ -13,9 +14,10 @@ export interface LogEntry {
 interface LogViewerProps {
   logs: LogEntry[];
   isActive: boolean;
+  onLogClick?: (log: LogEntry) => void;
 }
 
-export const LogViewer = ({ logs, isActive }: LogViewerProps) => {
+export const LogViewer = ({ logs, isActive, onLogClick }: LogViewerProps) => {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,27 +71,42 @@ export const LogViewer = ({ logs, isActive }: LogViewerProps) => {
       </div>
 
       <div className="bg-gradient-card rounded-lg border shadow-card">
-        <ScrollArea ref={scrollAreaRef} className="h-80 p-4">
+        <ScrollArea ref={scrollAreaRef} className="h-80">
           {logs.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
+            <div className="flex items-center justify-center h-full text-muted-foreground p-4">
               <p>No logs yet. Drop a file to start processing.</p>
             </div>
           ) : (
-            <div className="space-y-2 font-mono text-sm">
-              {logs.map((log) => (
-                <div key={log.id} className="flex items-start space-x-3 py-1">
-                  <span className="text-muted-foreground text-xs mt-0.5 whitespace-nowrap">
-                    {log.timestamp}
-                  </span>
-                  <Badge variant={getLevelBadgeVariant(log.level)} className="text-xs">
-                    {log.level.toUpperCase()}
-                  </Badge>
-                  <span className={cn("flex-1", getLevelColor(log.level))}>
-                    {log.message}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-20">Time</TableHead>
+                  <TableHead className="w-24">Level</TableHead>
+                  <TableHead>Message</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log) => (
+                  <TableRow 
+                    key={log.id} 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => onLogClick?.(log)}
+                  >
+                    <TableCell className="text-xs text-muted-foreground font-mono">
+                      {log.timestamp}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getLevelBadgeVariant(log.level)} className="text-xs">
+                        {log.level.toUpperCase()}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className={cn("font-mono text-sm", getLevelColor(log.level))}>
+                      {log.message}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           )}
         </ScrollArea>
       </div>
