@@ -1,130 +1,69 @@
 import { useState, useCallback } from 'react';
-import { FileDropZone } from '@/components/FileDropZone';
-import { ProcessingStatus, ProcessingState } from '@/components/ProcessingStatus';
-import { LogViewer, LogEntry } from '@/components/LogViewer';
-import { ResultsPanel, ProcessingResult } from '@/components/ResultsPanel';
-import { LogDetailModal } from '@/components/LogDetailModal';
+import { FileUpload } from '@/components/FileUpload';
+import { InquiryResults, InquiryResponse } from '@/components/InquiryResults';
+import { inquiryApi } from '@/services/inquiryApi';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Upload, MessageSquare, AlertCircle, History, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
-  const [processingState, setProcessingState] = useState<ProcessingState>('idle');
-  const [progress, setProgress] = useState(0);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [currentFile, setCurrentFile] = useState<File | null>(null);
-  const [result, setResult] = useState<ProcessingResult | null>(null);
-  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isDropModalOpen, setIsDropModalOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [inquiryResults, setInquiryResults] = useState<InquiryResponse[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const addLog = useCallback((level: LogEntry['level'], message: string) => {
-    const newLog: LogEntry = {
-      id: Math.random().toString(36).substr(2, 9),
-      timestamp: new Date().toLocaleTimeString(),
-      level,
-      message
-    };
-    setLogs(prev => [...prev, newLog]);
-  }, []);
-
-  const simulateProcessing = useCallback(async (file: File) => {
-    const startTime = Date.now();
-    setProcessingState('processing');
-    setProgress(0);
-    setResult(null);
+  const handleFileUpload = useCallback(async (file: File) => {
+    setIsProcessing(true);
+    setError(null);
+    setInquiryResults([]);
 
     try {
-      addLog('info', `Starting to process file: ${file.name}`);
-      addLog('info', `File size: ${(file.size / 1024).toFixed(2)} KB`);
-      
-      // Simulate reading file
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setProgress(20);
-      addLog('info', 'Reading file contents...');
-
-      // Simulate validation
-      await new Promise(resolve => setTimeout(resolve, 700));
-      setProgress(40);
-      addLog('success', 'File validation completed');
-
-      // Simulate processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setProgress(60);
-      addLog('info', 'Processing file data...');
-
-      // Simulate analysis
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setProgress(80);
-      addLog('info', 'Analyzing content structure...');
-
-      // Generate random processing metrics
-      const linesProcessed = Math.floor(Math.random() * 10000) + 1000;
-      const hasWarnings = Math.random() > 0.7;
-      
-      if (hasWarnings) {
-        addLog('warning', 'Found some non-critical issues in the data');
-      }
-
-      // Complete processing
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setProgress(100);
-      addLog('success', `Processing completed successfully`);
-      addLog('info', `Processed ${linesProcessed.toLocaleString()} lines`);
-
-      const endTime = Date.now();
-      const processingTime = (endTime - startTime) / 1000;
-
-      // Generate result
-      const processingResult: ProcessingResult = {
-        fileName: file.name,
-        fileSize: file.size,
-        processingTime,
-        linesProcessed,
-        status: hasWarnings ? 'warning' : 'success',
-        metadata: {
-          type: file.type || 'unknown',
-          encoding: 'UTF-8',
-          checksum: Math.random().toString(36).substr(2, 16).toUpperCase()
-        },
-        summary: hasWarnings 
-          ? `File processed successfully with ${Math.floor(Math.random() * 5) + 1} warnings. All critical data has been validated.`
-          : 'File processed successfully without any issues. All data validated and ready for use.'
-      };
-
-      setResult(processingResult);
-      setProcessingState('success');
+      const results = await inquiryApi.processBatch(file);
+      setInquiryResults(results);
       
       toast({
         title: "Processing Complete",
-        description: `Successfully processed ${file.name}`,
+        description: `Successfully processed ${results.length} inquiries`,
       });
-
     } catch (error) {
-      addLog('error', `Processing failed: ${error}`);
-      setProcessingState('error');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(errorMessage);
       
       toast({
         title: "Processing Failed",
-        description: "An error occurred while processing the file",
+        description: errorMessage,
         variant: "destructive",
       });
+    } finally {
+      setIsProcessing(false);
     }
-  }, [addLog, toast]);
+  }, [toast]);
 
-  const handleFileSelect = useCallback((file: File) => {
-    setCurrentFile(file);
-    setLogs([]);
-    setIsDropModalOpen(false);
-    simulateProcessing(file);
-  }, [simulateProcessing]);
+  const handleDownloadResults = useCallback(() => {
+    if (inquiryResults.length === 0) return;
 
-  const handleLogClick = useCallback((log: LogEntry) => {
-    setSelectedLog(log);
-    setIsDetailModalOpen(true);
-  }, []);
+    const csvContent = [
+      ['Email', 'Category', 'Response'].join(','),
+      ...inquiryResults.map(row => [
+        `"${row.email}"`,
+        `"${row.category}"`,
+        `"${row.response.replace(/"/g, '""')}"`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inquiry-results-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [inquiryResults]);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -132,61 +71,105 @@ const Index = () => {
         {/* Header */}
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            File Processor
+            Inquiry Processor
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Drop your files here to process them and view detailed logs and results in real-time
+            Upload CSV or JSON files with inquiries to get AI-powered classifications and responses
           </p>
         </div>
 
-        {/* Upload Button */}
-        <div className="text-center">
-          <Dialog open={isDropModalOpen} onOpenChange={setIsDropModalOpen}>
-            <DialogTrigger asChild>
-              <Button size="lg" className="h-14 px-8">
-                <Upload className="mr-2 h-5 w-5" />
-                Upload File to Process
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Upload File for Processing</DialogTitle>
-              </DialogHeader>
-              <FileDropZone 
-                onFileSelect={handleFileSelect}
-                isProcessing={processingState === 'processing'}
-              />
-            </DialogContent>
-          </Dialog>
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="bg-gradient-card shadow-card">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Processed</CardTitle>
+              <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{inquiryResults.length}</div>
+              <p className="text-xs text-muted-foreground">inquiries this session</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-card shadow-card">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Status</CardTitle>
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 text-primary animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 text-muted-foreground" />
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {isProcessing ? 'Processing...' : 'Ready'}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {isProcessing ? 'analyzing inquiries' : 'upload a file to start'}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-card shadow-card">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Categories</CardTitle>
+              <History className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {new Set(inquiryResults.map(r => r.category)).size}
+              </div>
+              <p className="text-xs text-muted-foreground">unique categories identified</p>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Processing Status */}
-        {processingState !== 'idle' && (
-          <ProcessingStatus
-            state={processingState}
-            progress={progress}
-            fileName={currentFile?.name}
-          />
+        {/* File Upload Section */}
+        <Card className="bg-gradient-card shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Upload className="h-5 w-5" />
+              Upload Inquiry File
+            </CardTitle>
+            <CardDescription>
+              Upload a CSV or JSON file containing inquiry data. Required fields: Inquiry ID, Listing ID, Inquirer Name, Inquirer Email, Message, Date, Phone Number.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FileUpload onFileUpload={handleFileUpload} isProcessing={isProcessing} />
+          </CardContent>
+        </Card>
+
+        {/* Error Display */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
         )}
 
-        {/* Logs Table */}
-        {logs.length > 0 && (
-          <LogViewer 
-            logs={logs}
-            isActive={processingState === 'processing'}
-            onLogClick={handleLogClick}
-          />
+        {/* Progress Indicator */}
+        {isProcessing && (
+          <Card className="bg-gradient-card shadow-card">
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Processing inquiries...</span>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+                <Progress value={undefined} className="w-full" />
+                <p className="text-sm text-muted-foreground">
+                  Analyzing and categorizing inquiries with AI
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
-        {/* Results Section */}
-        <ResultsPanel result={result} />
-
-        {/* Log Detail Modal */}
-        <LogDetailModal
-          open={isDetailModalOpen}
-          onOpenChange={setIsDetailModalOpen}
-          log={selectedLog}
-          result={result}
+        {/* Results Display */}
+        <InquiryResults 
+          results={inquiryResults} 
+          onDownload={handleDownloadResults}
         />
       </div>
     </div>
