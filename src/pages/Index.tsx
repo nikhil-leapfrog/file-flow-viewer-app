@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { FileUpload } from '@/components/FileUpload';
 import { InquiryResults, InquiryResponse } from '@/components/InquiryResults';
+import { InquiryDetailModal } from '@/components/InquiryDetailModal';
 import { inquiryApi } from '@/services/inquiryApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,8 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [inquiryResults, setInquiryResults] = useState<InquiryResponse[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedInquiry, setSelectedInquiry] = useState<InquiryResponse | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const { toast } = useToast();
 
   const handleFileUpload = useCallback(async (file: File) => {
@@ -64,6 +67,11 @@ const Index = () => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }, [inquiryResults]);
+
+  const handleInquiryClick = useCallback((inquiry: InquiryResponse) => {
+    setSelectedInquiry(inquiry);
+    setIsDetailModalOpen(true);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -170,6 +178,14 @@ const Index = () => {
         <InquiryResults 
           results={inquiryResults} 
           onDownload={handleDownloadResults}
+          onInquiryClick={handleInquiryClick}
+        />
+
+        {/* Inquiry Detail Modal */}
+        <InquiryDetailModal
+          open={isDetailModalOpen}
+          onOpenChange={setIsDetailModalOpen}
+          inquiry={selectedInquiry}
         />
       </div>
     </div>

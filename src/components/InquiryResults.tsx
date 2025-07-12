@@ -8,14 +8,21 @@ export interface InquiryResponse {
   email: string;
   category: string;
   response: string;
+  inquiryId?: string;
+  listingId?: string;
+  inquirerName?: string;
+  phoneNumber?: string;
+  date?: string;
+  originalMessage?: string;
 }
 
 interface InquiryResultsProps {
   results: InquiryResponse[];
   onDownload?: () => void;
+  onInquiryClick?: (inquiry: InquiryResponse) => void;
 }
 
-export const InquiryResults = ({ results, onDownload }: InquiryResultsProps) => {
+export const InquiryResults = ({ results, onDownload, onInquiryClick }: InquiryResultsProps) => {
   if (results.length === 0) {
     return null;
   }
@@ -79,7 +86,11 @@ export const InquiryResults = ({ results, onDownload }: InquiryResultsProps) => 
             </TableHeader>
             <TableBody>
               {results.map((inquiry, index) => (
-                <TableRow key={index}>
+                <TableRow 
+                  key={index}
+                  className={onInquiryClick ? "cursor-pointer hover:bg-muted/50 transition-colors" : ""}
+                  onClick={() => onInquiryClick?.(inquiry)}
+                >
                   <TableCell className="font-medium">
                     {inquiry.email}
                   </TableCell>
@@ -92,7 +103,7 @@ export const InquiryResults = ({ results, onDownload }: InquiryResultsProps) => 
                     </Badge>
                   </TableCell>
                   <TableCell className="max-w-md">
-                    <p className="text-sm leading-relaxed">
+                    <p className="text-sm leading-relaxed truncate">
                       {inquiry.response}
                     </p>
                   </TableCell>
