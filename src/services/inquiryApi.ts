@@ -5,10 +5,15 @@ export interface InquiryResponse {
 }
 
 export interface InquiryHistory {
-  id: string;
-  filename: string;
-  totalInquiries: number;
-  processedAt: string;
+  id: number;
+  email: string;
+  category: string;
+  message: string;
+  response: string;
+  email_title: string | null;
+  email_body: string | null;
+  listing_id: string;
+  created_at: string;
 }
 
 export interface ProgressResponse {

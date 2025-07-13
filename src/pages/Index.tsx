@@ -274,16 +274,24 @@ const Index = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {historyResults.map((history) => (
-                      <div key={history.id} className="border rounded-lg p-4 space-y-2">
+                    {historyResults.map((inquiry) => (
+                      <div key={inquiry.id} className="border rounded-lg p-4 space-y-2 cursor-pointer hover:bg-muted/50" 
+                           onClick={() => handleInquiryClick(inquiry)}>
                         <div className="flex items-center justify-between">
-                          <h3 className="font-medium">{history.filename}</h3>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                              {inquiry.category}
+                            </span>
+                            <span className="text-sm font-medium truncate max-w-xs">
+                              {inquiry.email}
+                            </span>
+                          </div>
                           <span className="text-sm text-muted-foreground">
-                            {new Date(history.processedAt).toLocaleDateString()}
+                            {new Date(inquiry.created_at).toLocaleDateString()}
                           </span>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {history.totalInquiries} inquiries processed
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {inquiry.message}
                         </p>
                       </div>
                     ))}
