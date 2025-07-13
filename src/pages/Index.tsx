@@ -2,23 +2,38 @@ import { useState, useCallback, useEffect } from 'react';
 import { FileUpload } from '@/components/FileUpload';
 import { InquiryResults, InquiryResponse } from '@/components/InquiryResults';
 import { InquiryDetailModal } from '@/components/InquiryDetailModal';
-import { inquiryApi } from '@/services/inquiryApi';
+import { inquiryApi, InquiryHistory } from '@/services/inquiryApi';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Upload, MessageSquare, AlertCircle, History, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [inquiryResults, setInquiryResults] = useState<InquiryResponse[]>([]);
+  const [historyResults, setHistoryResults] = useState<InquiryHistory[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedInquiry, setSelectedInquiry] = useState<InquiryResponse | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [progress, setProgress] = useState<number>(0);
   const [jobId, setJobId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Load history on component mount
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const history = await inquiryApi.getHistory();
+        setHistoryResults(history);
+      } catch (error) {
+        console.error('Failed to load history:', error);
+      }
+    };
+    loadHistory();
+  }, []);
 
   // Poll for progress updates
   useEffect(() => {
@@ -34,6 +49,14 @@ const Index = () => {
         if (progressData.status === 'completed') {
           setIsProcessing(false);
           setJobId(null);
+          
+          // Refresh history when processing completes
+          try {
+            const history = await inquiryApi.getHistory();
+            setHistoryResults(history);
+          } catch (error) {
+            console.error('Failed to refresh history:', error);
+          }
           
           toast({
             title: "Processing Complete",
@@ -212,12 +235,64 @@ const Index = () => {
           </Card>
         )}
 
-        {/* Results Display */}
-        <InquiryResults 
-          results={inquiryResults} 
-          onDownload={handleDownloadResults}
-          onInquiryClick={handleInquiryClick}
-        />
+        {/* Tabs for Results and History */}
+        <Tabs defaultValue="current" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="current" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Current Processing
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              History
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="current" className="mt-6">
+            <InquiryResults 
+              results={inquiryResults} 
+              onDownload={handleDownloadResults}
+              onInquiryClick={handleInquiryClick}
+            />
+          </TabsContent>
+          
+          <TabsContent value="history" className="mt-6">
+            <Card className="bg-gradient-card shadow-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5" />
+                  Processing History
+                </CardTitle>
+                <CardDescription>
+                  View previously processed inquiry files
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {historyResults.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No processing history available
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {historyResults.map((history) => (
+                      <div key={history.id} className="border rounded-lg p-4 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-medium">{history.filename}</h3>
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(history.processedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {history.totalInquiries} inquiries processed
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Inquiry Detail Modal */}
         <InquiryDetailModal

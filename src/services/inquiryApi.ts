@@ -6,9 +6,8 @@ export interface InquiryResponse {
 
 export interface InquiryHistory {
   id: string;
-  email: string;
-  category: string;
-  response: string;
+  filename: string;
+  totalInquiries: number;
   processedAt: string;
 }
 
