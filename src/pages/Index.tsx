@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { FileUpload } from '@/components/FileUpload';
 import { InquiryResults, InquiryResponse } from '@/components/InquiryResults';
 import { InquiryDetailModal } from '@/components/InquiryDetailModal';
@@ -16,32 +16,67 @@ const Index = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedInquiry, setSelectedInquiry] = useState<InquiryResponse | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [progress, setProgress] = useState<number>(0);
+  const [jobId, setJobId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Poll for progress updates
+  useEffect(() => {
+    if (!jobId || !isProcessing) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const progressData = await inquiryApi.getProgress(jobId);
+        
+        setProgress((progressData.progress / progressData.total) * 100);
+        setInquiryResults(progressData.results);
+        
+        if (progressData.status === 'completed') {
+          setIsProcessing(false);
+          setJobId(null);
+          
+          toast({
+            title: "Processing Complete",
+            description: `Successfully processed ${progressData.results.length} inquiries`,
+          });
+        } else if (progressData.status === 'error') {
+          setIsProcessing(false);
+          setJobId(null);
+          setError(progressData.error || 'Processing failed');
+          
+          toast({
+            title: "Processing Failed",
+            description: progressData.error || 'Processing failed',
+            variant: "destructive",
+          });
+        }
+      } catch (err) {
+        console.error('Error polling progress:', err);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [jobId, isProcessing, toast]);
 
   const handleFileUpload = useCallback(async (file: File) => {
     setIsProcessing(true);
     setError(null);
     setInquiryResults([]);
+    setProgress(0);
 
     try {
-      const results = await inquiryApi.processBatch(file);
-      setInquiryResults(results);
-      
-      toast({
-        title: "Processing Complete",
-        description: `Successfully processed ${results.length} inquiries`,
-      });
+      const response = await inquiryApi.processBatch(file);
+      setJobId(response.jobId);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setError(errorMessage);
+      setIsProcessing(false);
       
       toast({
         title: "Processing Failed",
         description: errorMessage,
         variant: "destructive",
       });
-    } finally {
-      setIsProcessing(false);
     }
   }, [toast]);
 
@@ -163,9 +198,12 @@ const Index = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Processing inquiries...</span>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{Math.round(progress)}%</span>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </div>
                 </div>
-                <Progress value={undefined} className="w-full" />
+                <Progress value={progress} className="w-full" />
                 <p className="text-sm text-muted-foreground">
                   Analyzing and categorizing inquiries with AI
                 </p>

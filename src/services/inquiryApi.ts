@@ -12,10 +12,18 @@ export interface InquiryHistory {
   processedAt: string;
 }
 
+export interface ProgressResponse {
+  progress: number;
+  total: number;
+  status: 'processing' | 'completed' | 'error';
+  results: InquiryResponse[];
+  error?: string;
+}
+
 export class InquiryApiService {
   private baseUrl = '/api'; // Update with your actual API base URL
 
-  async processBatch(file: File): Promise<InquiryResponse[]> {
+  async processBatch(file: File): Promise<{ jobId: string }> {
     const formData = new FormData();
     formData.append('file', file);
 
@@ -37,11 +45,21 @@ export class InquiryApiService {
 
     const data = await response.json();
     
-    if (!Array.isArray(data) || data.length === 0) {
-      throw new Error('No valid inquiries were returned from the file');
+    if (!data.jobId) {
+      throw new Error('No job ID returned from the server');
     }
 
     return data;
+  }
+
+  async getProgress(jobId: string): Promise<ProgressResponse> {
+    const response = await fetch(`/progress/${jobId}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch progress');
+    }
+
+    return response.json();
   }
 
   async getHistory(): Promise<InquiryHistory[]> {
